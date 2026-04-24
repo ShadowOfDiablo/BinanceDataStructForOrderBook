@@ -10,15 +10,14 @@ struct PriceLevel {
 };
 
 class OrderBook {
-public:
-    void updateBid(double price, double quantity);
-    void updateAsk(double price, double quantity);
-    
-    void display() const;
-
 private:
     // Bids: highest price first
     std::map<double, double, std::greater<double>> bids_;
     // Asks: lowest price first
     std::map<double, double> asks_;
+public:
+    void updateBid(double price, double quantity);
+    void updateAsk(double price, double quantity);
+    
+    void display() const;
 };

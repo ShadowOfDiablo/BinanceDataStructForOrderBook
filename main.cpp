@@ -1,27 +1,19 @@
-#include "orderbook.hpp"
+#include "symbolBook.hpp"
 #include <iostream>
 
 int main() {
-    OrderBook book;
+    SymbolBook symbol_book;
+    symbol_book.updateOrderBook("AAPL", 150.0, 100.0, true);
+    symbol_book.updateOrderBook("AAPL", 151.0, 50.0, false);
+    symbol_book.updateOrderBook("GOOG", 2800.0, 10.0, true);
+    symbol_book.updateOrderBook("GOOG", 2810.0, 5.0, false);
 
-    // Add some sample data
-    book.updateBid(100.5, 10.0);
-    book.updateBid(100.4, 15.0);
-    book.updateAsk(100.6, 8.0);
-    book.updateAsk(100.7, 12.0);
-
-    std::cout << "Initial Book:" << std::endl;
-    book.display();
-
-    // Update a level
-    std::cout << "\nUpdating Bid 100.5 to quantity 5.0..." << std::endl;
-    book.updateBid(100.5, 5.0);
-    
-    // Remove a level
-    std::cout << "Removing Ask 100.7..." << std::endl;
-    book.updateAsk(100.7, 0.0);
-
-    book.display();
+    std::cout << "Displaying all order books:\n";
+    symbol_book.display();
+    std::cout << "\nGetting order book for AAPL:\n";
+    symbol_book.getOrderBook("AAPL");
+    std::cout << "\nGetting order book for GOOG:\n";
+    symbol_book.getOrderBook("GOOG");
 
     return 0;
 }
