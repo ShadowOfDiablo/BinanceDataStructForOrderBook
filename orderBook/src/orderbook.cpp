@@ -1,19 +1,19 @@
 #include "orderbook.hpp"
 #include <iomanip>
 
-void OrderBook::updateBid(double price, double quantity) {
-    if (quantity == 0) {
-        bids_.erase(price);
+void OrderBook::updateBid(double dPrice, double dQuantity) {
+    if (dQuantity == 0) {
+        bids.erase(dPrice);
     } else {
-        bids_[price] = quantity;
+        bids[dPrice] = dQuantity;
     }
 }
 
-void OrderBook::updateAsk(double price, double quantity) {
-    if (quantity == 0) {
-        asks_.erase(price);
+void OrderBook::updateAsk(double dPrice, double dQuantity) {
+    if (dQuantity == 0) {
+        asks.erase(dPrice);
     } else {
-        asks_[price] = quantity;
+        asks[dPrice] = dQuantity;
     }
 }
 
@@ -22,15 +22,15 @@ void OrderBook::display() const {
     std::cout << std::fixed << std::setprecision(4);
     
     std::cout << "Asks:\n";
-    for (auto it = asks_.rbegin(); it != asks_.rend(); ++it) {
+    for (auto it = asks.rbegin(); it != asks.rend(); ++it) {
         std::cout << it->first << " : " << it->second << "\n";
     }
     
     std::cout << "------------------\n";
     
     std::cout << "Bids:\n";
-    for (const auto& [price, qty] : bids_) {
-        std::cout << price << " : " << qty << "\n";
+    for (const auto& [dPrice, dQuantity] : bids) {
+        std::cout << dPrice << " : " << dQuantity << "\n";
     }
     std::cout << "------------------\n";
 }

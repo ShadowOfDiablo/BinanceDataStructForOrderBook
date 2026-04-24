@@ -1,26 +1,36 @@
 #include "symbolBook.hpp"
 
 void SymbolBook::display() const {
-    for (const auto& [symbol, order_book] : order_books_) {
-        std::cout << "Symbol: " << symbol << "\n";
-        order_book.display();
+    for (const auto& [strSymbol, sOrderBook] : orderBooks) {
+        std::cout << "Symbol: " << strSymbol << "\n";
+        sOrderBook.display();
     }
 }
 
-void SymbolBook::getOrderBook(const std::string& symbol) const {
-    auto it = order_books_.find(symbol);
-    if (it != order_books_.end()) {
-        std::cout << "Symbol: " << symbol << "\n";
+void SymbolBook::getOrderBook(const std::string& strSymbol) const {
+    auto it = orderBooks.find(strSymbol);
+    if (it != orderBooks.end()) {
+        std::cout << "Symbol: " << strSymbol << "\n";
         it->second.display();
     } else {
-        std::cout << "Symbol not found: " << symbol << "\n";
+        std::cout << "Symbol not found: " << strSymbol << "\n";
     }
 }
 
-void SymbolBook::updateOrderBook(const std::string& symbol, double price, double quantity, bool is_bid) {
-    if (is_bid) {
-        order_books_[symbol].updateBid(price, quantity);
+void SymbolBook::updateOrderBook(const std::string& strSymbol, double dPrice, double dQuantity, bool bIsBid) {
+    if (bIsBid) {
+        orderBooks[strSymbol].updateBid(dPrice, dQuantity);
     } else {
-        order_books_[symbol].updateAsk(price, quantity);
+        orderBooks[strSymbol].updateAsk(dPrice, dQuantity);
+    }
+}
+
+void SymbolBook::handleDepthUpdate(const DepthUpdate& sUpdate) {
+    auto& sBook = orderBooks[sUpdate.strSymbol];
+    for (const auto& [dPrice, dQuantity] : sUpdate.bids) {
+        sBook.updateBid(dPrice, dQuantity);
+    }
+    for (const auto& [dPrice, dQuantity] : sUpdate.asks) {
+        sBook.updateAsk(dPrice, dQuantity);
     }
 }

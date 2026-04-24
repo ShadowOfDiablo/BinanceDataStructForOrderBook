@@ -4,20 +4,15 @@
 #include <vector>
 #include <iostream>
 
-struct PriceLevel {
-    double price;
-    double quantity;
-};
-
 class OrderBook {
 private:
     // Bids: highest price first
-    std::map<double, double, std::greater<double>> bids_;
+    std::map<double, double, std::greater<double>> bids;
     // Asks: lowest price first
-    std::map<double, double> asks_;
+    std::map<double, double> asks;
 public:
-    void updateBid(double price, double quantity);
-    void updateAsk(double price, double quantity);
+    void updateBid(double dPrice, double dQuantity);
+    void updateAsk(double dPrice, double dQuantity);
     
     void display() const;
 };

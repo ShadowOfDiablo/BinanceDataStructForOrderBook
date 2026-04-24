@@ -2,18 +2,31 @@
 #include <iostream>
 
 int main() {
-    SymbolBook symbol_book;
-    symbol_book.updateOrderBook("AAPL", 150.0, 100.0, true);
-    symbol_book.updateOrderBook("AAPL", 151.0, 50.0, false);
-    symbol_book.updateOrderBook("GOOG", 2800.0, 10.0, true);
-    symbol_book.updateOrderBook("GOOG", 2810.0, 5.0, false);
+    SymbolBook s_symbolBook;
 
-    std::cout << "Displaying all order books:\n";
-    symbol_book.display();
-    std::cout << "\nGetting order book for AAPL:\n";
-    symbol_book.getOrderBook("AAPL");
-    std::cout << "\nGetting order book for GOOG:\n";
-    symbol_book.getOrderBook("GOOG");
+    // Example DepthUpdate
+    DepthUpdate s_update;
+    s_update.str_eventType = "depthUpdate";
+    s_update.lleventTime = 1672515782136;
+    s_update.strSymbol = "BNBBTC";
+    s_update.llFirstUpdateId = 157;
+    s_update.llFinalUpdateId = 160;
+    s_update.bids = {{0.0024, 10.0}};
+    s_update.asks = {{0.0026, 100.0}};
+
+    std::cout << "Handling initial depth update for BNBBTC...\n";
+    s_symbolBook.handleDepthUpdate(s_update);
+    s_symbolBook.display();
+
+    // Example of an update that removes a price level (quantity = 0)
+    DepthUpdate s_update2;
+    s_update2.strSymbol = "BNBBTC";
+    s_update2.bids = {{0.0024, 0.0}}; // Remove bid at 0.0024
+    s_update2.asks = {{0.0027, 50.0}}; // Add new ask at 0.0027
+
+    std::cout << "\nHandling subsequent depth update for BNBBTC (removing 0.0024 bid)...\n";
+    s_symbolBook.handleDepthUpdate(s_update2);
+    s_symbolBook.display();
 
     return 0;
 }
