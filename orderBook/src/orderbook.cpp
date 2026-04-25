@@ -34,3 +34,39 @@ void OrderBook::display() const {
     }
     std::cout << "------------------\n";
 }
+
+void OrderBook::setLastUpdateId(int64_t id) {
+    lastUpdateId = id;
+}
+
+int64_t OrderBook::getLastUpdateId() const {
+    return lastUpdateId;
+}
+
+OrderBook::OrderBook() : lastUpdateId(0) {
+}
+
+OrderBook::~OrderBook() {
+    bids.clear();
+    asks.clear();
+    lastUpdateId = 0;
+}
+
+OrderBook::OrderBook(const OrderBook& source) {
+    lastUpdateId = source.lastUpdateId;
+    bids = source.bids;
+    asks = source.asks;
+}
+
+OrderBook& OrderBook::operator=(const OrderBook& source) {
+    if (this != &source) {
+        lastUpdateId = source.lastUpdateId;
+        bids = source.bids;
+        asks = source.asks;
+    }
+    return *this;
+}
+
+bool OrderBook::operator==(const OrderBook& other) const {
+    return lastUpdateId == other.lastUpdateId && bids == other.bids && asks == other.asks;
+}

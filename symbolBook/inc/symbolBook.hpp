@@ -19,7 +19,8 @@ private:
 
 public:
     void display() const;
-    void getOrderBook(const std::string& strSymbol) const;
+    const OrderBook& getOrderBook(const std::string& strSymbol) const;
     void updateOrderBook(const std::string& strSymbol, double dPrice, double dQuantity, bool bIsBid);
     void handleDepthUpdate(const DepthUpdate& sUpdate);
+    ~SymbolBook() = default;
 };
