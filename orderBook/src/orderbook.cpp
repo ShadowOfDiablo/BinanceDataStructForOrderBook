@@ -35,6 +35,18 @@ void OrderBook::display() const {
     std::cout << "------------------\n";
 }
 
+void OrderBook::applySnapshot(int64_t snapshotLastUpdateId,
+                              const std::vector<std::pair<double, double>>& snapshotBids,
+                              const std::vector<std::pair<double, double>>& snapshotAsks) {
+    bids.clear();
+    asks.clear();
+    for (const auto& [price, qty] : snapshotBids)
+        if (qty > 0) bids[price] = qty;
+    for (const auto& [price, qty] : snapshotAsks)
+        if (qty > 0) asks[price] = qty;
+    lastUpdateId = snapshotLastUpdateId;
+}
+
 void OrderBook::setLastUpdateId(int64_t id) {
     lastUpdateId = id;
 }
@@ -69,4 +81,12 @@ OrderBook& OrderBook::operator=(const OrderBook& source) {
 
 bool OrderBook::operator==(const OrderBook& other) const {
     return lastUpdateId == other.lastUpdateId && bids == other.bids && asks == other.asks;
+}
+
+double OrderBook::getBestBid() const {
+    return bids.empty() ? 0.0 : bids.begin()->first;
+}
+
+double OrderBook::getBestAsk() const {
+    return asks.empty() ? 0.0 : asks.begin()->first;
 }

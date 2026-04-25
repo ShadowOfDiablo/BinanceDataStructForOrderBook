@@ -24,17 +24,29 @@ void SymbolBook::updateOrderBook(const std::string& strSymbol, double dPrice, do
     }
 }
 
+void SymbolBook::applySnapshot(const Snapshot& sSnapshot) {
+    orderBooks[sSnapshot.strSymbol].applySnapshot(
+        sSnapshot.llLastUpdateId, sSnapshot.bids, sSnapshot.asks);
+    std::cout << "Snapshot applied for " << sSnapshot.strSymbol
+              << " lastUpdateId=" << sSnapshot.llLastUpdateId << "\n";
+}
+
 void SymbolBook::handleDepthUpdate(const DepthUpdate& sUpdate)
 {
+    int returnCode = 0;
     auto& sBook = orderBooks[sUpdate.strSymbol];
 
-    if (sBook.getLastUpdateId() > sUpdate.llFinalUpdateId) {
-        std::cout << "Stale update for " << sUpdate.strSymbol << ". Ignoring.\n";
+    if (sUpdate.llFinalUpdateId <= sBook.getLastUpdateId()) {
+        returnCode = 1;
+        std::cerr << "Skipping update for " << sUpdate.strSymbol
+                  << " u=" << sUpdate.llFinalUpdateId
+                  << " lastUpdateId=" << sBook.getLastUpdateId() << "\n";
         return;
     }
 
     if (sUpdate.llFirstUpdateId > sBook.getLastUpdateId() + 1) {
-        std::cout << "Gap detected for " << sUpdate.strSymbol
+        returnCode = 2;
+        std::cerr << "Gap detected for " << sUpdate.strSymbol
                   << ". Expected " << sBook.getLastUpdateId() + 1
                   << " but got U=" << sUpdate.llFirstUpdateId << ". Need resync.\n";
         return;
