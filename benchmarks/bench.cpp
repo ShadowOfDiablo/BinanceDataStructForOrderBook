@@ -1,6 +1,6 @@
 #include <benchmark/benchmark.h>
-#include "orderbook.hpp"
-#include "symbolBook.hpp"
+#include "orderbook.h"
+#include "symbolBook.h"
 
 // Prices are stored as integer ticks (price × 1e8) so that map keys are exact
 // integers with no floating-point comparison ambiguity. The two constants below

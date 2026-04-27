@@ -5,33 +5,44 @@
 #include <iomanip>
 #include <cmath>
 #include <limits>
+#include <fstream>
 
-// Prices in this codebase are stored as integer ticks: tick = price × 1e8.
-// This eliminates floating-point comparison uncertainty when prices are used as
-// map keys — the same tick always means the same price level, unambiguously.
-//
-// BNBBTC sample prices (from Binance depth stream API example used in SampleDataTest):
-static constexpr uint64_t BNBBTC_0020 = 200000ULL;   // 0.0020 BTC per BNB
-static constexpr uint64_t BNBBTC_0022 = 220000ULL;   // 0.0022 BTC per BNB
-static constexpr uint64_t BNBBTC_0024 = 240000ULL;   // 0.0024 BTC per BNB — initial best bid/ask
-static constexpr uint64_t BNBBTC_0025 = 250000ULL;   // 0.0025 BTC per BNB — new best bid in update 4
-static constexpr uint64_t BNBBTC_0026 = 260000ULL;   // 0.0026 BTC per BNB — initial best ask above spread
-static constexpr uint64_t BNBBTC_0027 = 270000ULL;   // 0.0027 BTC per BNB
-static constexpr uint64_t BNBBTC_0028 = 280000ULL;   // 0.0028 BTC per BNB
-static constexpr uint64_t BNBBTC_0030 = 300000ULL;   // 0.0030 BTC per BNB — used in snapshot reapplication test
-static constexpr uint64_t BNBBTC_0032 = 320000ULL;   // 0.0032 BTC per BNB — used in snapshot reapplication test
+static double rssmegabytes() {
+    std::ifstream f("/proc/self/status");
+    std::string line;
+    while (std::getline(f, line)) {
+        if (line.rfind("VmRSS:", 0) == 0) {
+            long kb = 0;
+            std::sscanf(line.c_str(), "VmRSS: %ld", &kb);
+            return kb / 1024.0;
+        }
+    }
+    return -1.0;
+}
 
-// Generic prices for edge case and malformed-data tests (TSTUSDT, not BNBBTC):
-static constexpr uint64_t PRICE_50  = 5000000000ULL;   // 50.0  — injected by malformed update, should be ignored
-static constexpr uint64_t PRICE_100 = 10000000000ULL;  // 100.0 — initial bid in MalformedUpdate test
-static constexpr uint64_t PRICE_101 = 10100000000ULL;  // 101.0 — initial ask in MalformedUpdate test
+// Prevents dead-code elimination of timing loops.
+static volatile uint64_t gSink = 0;
 
-// Scale test prices: base 1.0 ± 0.0001 steps, used for the 2000-symbol and
-// corruption-resilience tests where specific price semantics do not matter.
-static constexpr uint64_t SCALE_BASE = 100000000ULL;  // 1.0 × 1e8 — midpoint of the scale test range
-static constexpr uint64_t SCALE_STEP = 10000ULL;       // 0.0001 × 1e8 — spacing between adjacent levels
+// Prices are stored as integer ticks (price × 1e8) for exact map-key comparison.
+// BNBBTC sample prices used by SampleDataTest:
+static constexpr uint64_t BNBBTC_0020 = 200000ULL;   // 0.0020
+static constexpr uint64_t BNBBTC_0022 = 220000ULL;   // 0.0022
+static constexpr uint64_t BNBBTC_0024 = 240000ULL;   // 0.0024
+static constexpr uint64_t BNBBTC_0025 = 250000ULL;   // 0.0025
+static constexpr uint64_t BNBBTC_0026 = 260000ULL;   // 0.0026
+static constexpr uint64_t BNBBTC_0027 = 270000ULL;   // 0.0027
+static constexpr uint64_t BNBBTC_0028 = 280000ULL;   // 0.0028
+static constexpr uint64_t BNBBTC_0030 = 300000ULL;   // 0.0030
+static constexpr uint64_t BNBBTC_0032 = 320000ULL;   // 0.0032
 
-// OrderBook unit tests
+// Generic prices for malformed-data tests:
+static constexpr uint64_t PRICE_50  = 5000000000ULL;
+static constexpr uint64_t PRICE_100 = 10000000000ULL;
+static constexpr uint64_t PRICE_101 = 10100000000ULL;
+
+// Scale test: 1.0 base, 0.0001 step.
+static constexpr uint64_t SCALE_BASE = 100000000ULL;
+static constexpr uint64_t SCALE_STEP = 10000ULL;
 
 TEST(OrderBookTest, EmptyBookBestPrices) {
     OrderBook book;
@@ -82,7 +93,6 @@ TEST(OrderBookTest, UpdateBidAdjustsQuantity) {
     EXPECT_EQ(book.getBestBid(), BNBBTC_0024);
 }
 
-// SymbolBook integration tests
 class SampleDataTest : public ::testing::Test {
 protected:
     SymbolBook symbolBook;
@@ -163,29 +173,55 @@ TEST_F(SampleDataTest, Update5_FinalState) {
 }
 
 TEST_F(SampleDataTest, StaleUpdateIsIgnored) {
-    symbolBook.handleDepthUpdate(makeUpdate(1, 1, {{BNBBTC_0024, 10}}, {{BNBBTC_0026, 100}}));
-    // u=1 <= lastUpdateId=1 — stale, book must not change
-    symbolBook.handleDepthUpdate(makeUpdate(1, 1, {{BNBBTC_0020, 999}}, {}));
-    const auto& book = symbolBook.getOrderBook(SYMBOL);
-    EXPECT_EQ(book.getBestBid(), BNBBTC_0024);
+    // u=4 < lastUpdateId=5 — must be dropped.
+    symbolBook.handleDepthUpdate(makeUpdate(1, 5, {{BNBBTC_0024, 10}}, {{BNBBTC_0026, 100}}));
+    symbolBook.handleDepthUpdate(makeUpdate(1, 4, {{BNBBTC_0020, 999}}, {}));
+    EXPECT_EQ(symbolBook.getOrderBook(SYMBOL).getBestBid(), BNBBTC_0024);
 }
 
-TEST_F(SampleDataTest, GapDetectedBookUnchanged) {
-    // lastUpdateId=0 after snapshot; U=5 > 0+1 — gap
+TEST_F(SampleDataTest, GapDiscardsBookAndRequiresResnapshot) {
+    // U=5 > lastUpdateId(0)+1 — gap discards the book; resync requires a fresh snapshot.
     symbolBook.handleDepthUpdate(makeUpdate(5, 10, {{BNBBTC_0020, 999}}, {}));
-    const auto& book = symbolBook.getOrderBook(SYMBOL);
-    EXPECT_EQ(book.getBestBid(), BNBBTC_0024);
+    EXPECT_THROW(symbolBook.getOrderBook(SYMBOL), std::runtime_error);
+
+    symbolBook.handleDepthUpdate(makeUpdate(11, 11, {{BNBBTC_0024, 1}}, {}));
+    EXPECT_THROW(symbolBook.getOrderBook(SYMBOL), std::runtime_error);
+
+    Snapshot resync;
+    resync.strSymbol      = SYMBOL;
+    resync.llLastUpdateId = 100;
+    resync.bids = {{BNBBTC_0030, 1.0}};
+    resync.asks = {{BNBBTC_0032, 1.0}};
+    symbolBook.applySnapshot(resync);
+    EXPECT_EQ(symbolBook.getOrderBook(SYMBOL).getBestBid(), BNBBTC_0030);
+    EXPECT_EQ(symbolBook.getOrderBook(SYMBOL).getBestAsk(), BNBBTC_0032);
 }
 
 TEST_F(SampleDataTest, UnknownSymbolThrows) {
     EXPECT_THROW(symbolBook.getOrderBook("UNKNOWN"), std::runtime_error);
 }
 
-// Edge case / data integrity tests
+TEST(EdgeCaseTest, UpdateBeforeSnapshotRejected) {
+    // No snapshot first — both forms must drop without leaking a stub entry.
+    SymbolBook sb;
+    DepthUpdate u;
+    u.strSymbol       = "GHOST";
+    u.llFirstUpdateId = 1;
+    u.llFinalUpdateId = 1;
+    u.bids = {{PRICE_100, 1.0}};
+    sb.handleDepthUpdate(u);
+    EXPECT_THROW(sb.getOrderBook("GHOST"), std::runtime_error);
+
+    DepthUpdate noSeq;
+    noSeq.strSymbol = "GHOST2";
+    noSeq.bids = {{PRICE_100, 1.0}};
+    sb.handleDepthUpdate(noSeq);
+    EXPECT_THROW(sb.getOrderBook("GHOST2"), std::runtime_error);
+}
 
 TEST(EdgeCaseTest, ZeroPriceIgnored) {
     OrderBook book;
-    book.updateBid(0ULL, 5.0);  // tick=0 is the sentinel for "invalid price"
+    book.updateBid(0ULL, 5.0);  // tick 0 is the invalid-price sentinel
     EXPECT_EQ(book.getBestBid(), 0ULL);
 }
 
@@ -204,24 +240,21 @@ TEST(EdgeCaseTest, NaNQuantityIgnored) {
 TEST(EdgeCaseTest, ValidLevelNotAffectedByBadUpdate) {
     OrderBook book;
     book.updateBid(BNBBTC_0024, 10.0);
-    book.updateBid(0ULL, 99.0);                                             // zero price — invalid tick
-    book.updateBid(BNBBTC_0022, std::numeric_limits<double>::quiet_NaN()); // NaN qty — invalid
+    book.updateBid(0ULL, 99.0);
+    book.updateBid(BNBBTC_0022, std::numeric_limits<double>::quiet_NaN());
     EXPECT_EQ(book.getBestBid(), BNBBTC_0024);
 }
 
 TEST(EdgeCaseTest, SnapshotReapplicationClearsOldLevels) {
     OrderBook book;
     book.applySnapshot(1, {{BNBBTC_0024, 10.0}, {BNBBTC_0020, 5.0}}, {{BNBBTC_0026, 3.0}});
-    // Second snapshot at different price levels — old levels must be fully replaced
     book.applySnapshot(2, {{BNBBTC_0030, 1.0}}, {{BNBBTC_0032, 1.0}});
     EXPECT_EQ(book.getBestBid(), BNBBTC_0030);
     EXPECT_EQ(book.getBestAsk(), BNBBTC_0032);
 }
 
 TEST(EdgeCaseTest, MalformedUpdateUGreaterThanFinalU) {
-    // U=20 > u=15 is internally inconsistent; also a gap from lastUpdateId=10.
-    // The gap check (U > lastUpdateId+1) fires first and rejects the update,
-    // so PRICE_50 must never enter the book — best bid must remain PRICE_100.
+    // U=20, u=15 with lastUpdateId=10 — gap fires first, book is discarded.
     SymbolBook sb;
     Snapshot snap;
     snap.strSymbol      = "TSTUSDT";
@@ -237,13 +270,11 @@ TEST(EdgeCaseTest, MalformedUpdateUGreaterThanFinalU) {
     bad.bids = {{PRICE_50, 999.0}};
     sb.handleDepthUpdate(bad);
 
-    EXPECT_EQ(sb.getOrderBook("TSTUSDT").getBestBid(), PRICE_100);
+    EXPECT_THROW(sb.getOrderBook("TSTUSDT"), std::runtime_error);
 }
 
 TEST(EdgeCaseTest, AllCorruptLevelsInSnapshotProduceEmptyBook) {
-    // All bid entries are invalid: zero tick (invalid price), negative qty, NaN qty.
-    // All ask entries are invalid: zero tick, zero qty (snapshot requires qty > 0).
-    // Result: both sides of the book must be empty after applySnapshot.
+    // All levels invalid (zero tick, negative qty, NaN, zero qty) — book stays empty.
     OrderBook book;
     book.applySnapshot(1,
         {{0ULL, 5.0}, {1ULL, -1.0}, {2ULL, std::numeric_limits<double>::quiet_NaN()}},
@@ -318,6 +349,7 @@ TEST(ScaleTest, TwoThousandSymbols) {
     }
 
     auto t1 = std::chrono::steady_clock::now();
+    double memAfterSnapshots = rssmegabytes();
 
     for (int i = 0; i < NUM_SYMBOLS; ++i) {
         char buf[16];
@@ -355,5 +387,193 @@ TEST(ScaleTest, TwoThousandSymbols) {
               << UPDATES << " diffs   = " << updatesMs << " ms"
               << "  (" << std::fixed << std::setprecision(3)
               << (double(updatesMs) / (NUM_SYMBOLS * UPDATES) * 1000.0)
-              << " us/update)\n";
+              << " us/update)\n"
+              << "[ MEMORY  ] RSS after snapshots : "
+              << std::fixed << std::setprecision(1) << memAfterSnapshots << " MB\n"
+#ifdef EXTENDED_DEPTH
+              << "[ MEMORY  ] Depth mode          : extended (no cap)\n";
+#else
+              << "[ MEMORY  ] Depth mode          : normal (" << OrderBook::MAX_DEPTH << " levels/side)\n";
+#endif
+}
+
+// Binance's REST snapshot API caps at 5000 levels per side — this is the true worst case
+// for extended mode. Skipped in normal mode: levels would just be pruned to MAX_DEPTH anyway.
+#ifdef EXTENDED_DEPTH
+TEST(ScaleTest, BinanceMaxSnapshotDepth) {
+    constexpr int NUM_SYMBOLS = 2000;
+    constexpr int LEVELS      = 5000; // Binance /api/v3/depth?limit=5000 maximum
+
+    SymbolBook symbolBook;
+
+    auto t0 = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < NUM_SYMBOLS; ++i) {
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "SYM%04d", i);
+
+        Snapshot snap;
+        snap.strSymbol      = buf;
+        snap.llLastUpdateId = 0;
+        for (int l = 1; l <= LEVELS; ++l) {
+            snap.bids.push_back({SCALE_BASE - l * SCALE_STEP, static_cast<double>(l)});
+            snap.asks.push_back({SCALE_BASE + l * SCALE_STEP, static_cast<double>(l)});
+        }
+        symbolBook.applySnapshot(snap);
+    }
+
+    auto t1 = std::chrono::steady_clock::now();
+    double memAfterSnapshots = rssmegabytes();
+
+    for (int i = 0; i < NUM_SYMBOLS; ++i) {
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "SYM%04d", i);
+        const auto& book = symbolBook.getOrderBook(buf);
+        EXPECT_GT(book.getBestBid(), 0ULL) << "bad best bid for " << buf;
+        EXPECT_GT(book.getBestAsk(), 0ULL) << "bad best ask for " << buf;
+        EXPECT_LT(book.getBestBid(), book.getBestAsk()) << "crossed book for " << buf;
+    }
+
+    auto snapshotMs = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+
+    std::cout << "\n"
+              << "[ TIMING  ] Snapshot  : " << NUM_SYMBOLS << " symbols x "
+              << LEVELS << " levels = " << snapshotMs << " ms\n"
+              << "[ MEMORY  ] RSS after snapshots : "
+              << std::fixed << std::setprecision(1) << memAfterSnapshots << " MB\n"
+              << "[ MEMORY  ] Depth mode          : extended (no cap, Binance max = 5000 levels/side)\n";
+}
+#endif
+
+// Latency micro-tests
+// Wall-clock averages over many iterations — shows the real ns cost of each
+// individual operation. For tighter statistical CPU-cycle measurements, use
+// ./benchmark.sh instead.
+
+TEST(LatencyTest, InsertPriceLevel) {
+    // Normal mode: book pre-filled to MAX_DEPTH; each insert is a tree insert +
+    //              an immediate prune of the worst level — the hot steady-state path.
+    // Extended mode: book pre-filled to 500 levels; grows by 1 per iteration.
+    constexpr int ITERS = 500'000;
+
+#ifndef EXTENDED_DEPTH
+    constexpr int DEPTH = static_cast<int>(OrderBook::MAX_DEPTH);
+#else
+    constexpr int DEPTH = 500;
+#endif
+
+    OrderBook book;
+    for (int i = 1; i <= DEPTH; ++i)
+        book.updateBid(SCALE_BASE + static_cast<uint64_t>(i) * SCALE_STEP, static_cast<double>(i));
+
+    // Each inserted price is strictly better than the previous best bid,
+    // so in normal mode the worst level is always pruned on the same call.
+    auto t0 = std::chrono::steady_clock::now();
+    for (int i = 0; i < ITERS; ++i)
+        book.updateBid(SCALE_BASE + static_cast<uint64_t>(DEPTH + 1 + i) * SCALE_STEP, 1.0);
+    auto t1 = std::chrono::steady_clock::now();
+
+    auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
+    std::cout << "[ LATENCY ] Insert bid level"
+#ifndef EXTENDED_DEPTH
+              << " (at cap=" << OrderBook::MAX_DEPTH << ", includes prune)"
+#else
+              << " (no cap, starting depth=" << DEPTH << ")"
+#endif
+              << ": " << (ns / ITERS) << " ns/op\n";
+}
+
+TEST(LatencyTest, RemovePriceLevel) {
+    // Alternates remove (qty=0) + reinsert to keep the book populated.
+    // Total time divided by 2×ITERS so each individual op cost is reported.
+    constexpr int ITERS = 500'000;
+
+    OrderBook book;
+    for (int i = 1; i <= 20; ++i)
+        book.updateBid(SCALE_BASE + static_cast<uint64_t>(i) * SCALE_STEP, static_cast<double>(i));
+
+    const uint64_t target = SCALE_BASE + 10 * SCALE_STEP; // mid-book level
+
+    auto t0 = std::chrono::steady_clock::now();
+    for (int i = 0; i < ITERS; ++i) {
+        book.updateBid(target, 0.0); // remove
+        book.updateBid(target, 1.0); // reinsert so the next iteration has something to remove
+    }
+    auto t1 = std::chrono::steady_clock::now();
+
+    auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
+    std::cout << "[ LATENCY ] Remove bid level (remove+reinsert ÷ 2): "
+              << (ns / (2 * ITERS)) << " ns/op\n";
+}
+
+TEST(LatencyTest, UpdateExistingLevel) {
+    // Qty change on a level already in the book: map find + value overwrite,
+    // no structural tree change and no prune.
+    constexpr int ITERS = 1'000'000;
+
+    OrderBook book;
+    book.updateBid(SCALE_BASE, 10.0);
+
+    auto t0 = std::chrono::steady_clock::now();
+    for (int i = 0; i < ITERS; ++i)
+        book.updateBid(SCALE_BASE, static_cast<double>((i & 0xFF) + 1)); // qty 1-256, never 0
+    auto t1 = std::chrono::steady_clock::now();
+
+    auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
+    std::cout << "[ LATENCY ] Update existing bid qty: " << (ns / ITERS) << " ns/op\n";
+}
+
+TEST(LatencyTest, AddNewSymbol) {
+    // Time applySnapshot() for a brand-new symbol.
+    // Snapshot objects are pre-built so vector allocation is outside the timed region.
+    constexpr int ITERS = 10'000;
+#ifndef EXTENDED_DEPTH
+    constexpr int LEVELS = static_cast<int>(OrderBook::MAX_DEPTH);
+#else
+    constexpr int LEVELS = 500;
+#endif
+
+    std::vector<Snapshot> snaps;
+    snaps.reserve(ITERS);
+    for (int i = 0; i < ITERS; ++i) {
+        char buf[24];
+        std::snprintf(buf, sizeof(buf), "LATSYM%05d", i);
+        Snapshot s;
+        s.strSymbol      = buf;
+        s.llLastUpdateId = 0;
+        for (int l = 1; l <= LEVELS; ++l) {
+            s.bids.push_back({SCALE_BASE - static_cast<uint64_t>(l) * SCALE_STEP, static_cast<double>(l)});
+            s.asks.push_back({SCALE_BASE + static_cast<uint64_t>(l) * SCALE_STEP, static_cast<double>(l)});
+        }
+        snaps.push_back(std::move(s));
+    }
+
+    SymbolBook sb;
+    auto t0 = std::chrono::steady_clock::now();
+    for (auto& snap : snaps)
+        sb.applySnapshot(snap);
+    auto t1 = std::chrono::steady_clock::now();
+
+    auto us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+    std::cout << "[ LATENCY ] Add new symbol (" << LEVELS << " levels/side): "
+              << (us / ITERS) << " us/symbol  ("
+              << (us * 1000 / (ITERS * LEVELS * 2)) << " ns/level)\n";
+}
+
+TEST(LatencyTest, BestPriceLookup) {
+    constexpr int ITERS = 10'000'000;
+
+    OrderBook book;
+    book.updateBid(SCALE_BASE, 10.0);
+    book.updateAsk(SCALE_BASE + SCALE_STEP, 10.0);
+
+    uint64_t sum = 0;
+    auto t0 = std::chrono::steady_clock::now();
+    for (int i = 0; i < ITERS; ++i)
+        sum += book.getBestBid() + book.getBestAsk();
+    auto t1 = std::chrono::steady_clock::now();
+    gSink = sum;
+
+    auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
+    std::cout << "[ LATENCY ] Best bid+ask lookup: " << (ns / ITERS) << " ns/op\n";
 }
