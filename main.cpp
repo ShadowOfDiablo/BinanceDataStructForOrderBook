@@ -22,14 +22,14 @@ int main() {
                 s_snapshot.strSymbol = j.value("symbol", "");
                 s_snapshot.llLastUpdateId = j.value("lastUpdateId", 0LL);
                 for (const auto& bid : j["bids"]) {
-                    double dPrice = std::stod(bid[0].get<std::string>());
-                    double dQty   = std::stod(bid[1].get<std::string>());
-                    s_snapshot.bids.push_back({dPrice, dQty});
+                    if (!bid.is_array() || bid.size() < 2) continue;
+                    s_snapshot.bids.push_back({std::stod(bid[0].get<std::string>()),
+                                               std::stod(bid[1].get<std::string>())});
                 }
                 for (const auto& ask : j["asks"]) {
-                    double dPrice = std::stod(ask[0].get<std::string>());
-                    double dQty   = std::stod(ask[1].get<std::string>());
-                    s_snapshot.asks.push_back({dPrice, dQty});
+                    if (!ask.is_array() || ask.size() < 2) continue;
+                    s_snapshot.asks.push_back({std::stod(ask[0].get<std::string>()),
+                                               std::stod(ask[1].get<std::string>())});
                 }
                 s_symbolBook.applySnapshot(s_snapshot);
             } else {
@@ -41,14 +41,14 @@ int main() {
                 s_update.llFinalUpdateId = j.value("u", 0LL);
 
                 for (const auto& bid : j.value("b", json::array())) {
-                    double dPrice = std::stod(bid[0].get<std::string>());
-                    double dQty   = std::stod(bid[1].get<std::string>());
-                    s_update.bids.push_back({dPrice, dQty});
+                    if (!bid.is_array() || bid.size() < 2) continue;
+                    s_update.bids.push_back({std::stod(bid[0].get<std::string>()),
+                                             std::stod(bid[1].get<std::string>())});
                 }
                 for (const auto& ask : j.value("a", json::array())) {
-                    double dPrice = std::stod(ask[0].get<std::string>());
-                    double dQty   = std::stod(ask[1].get<std::string>());
-                    s_update.asks.push_back({dPrice, dQty});
+                    if (!ask.is_array() || ask.size() < 2) continue;
+                    s_update.asks.push_back({std::stod(ask[0].get<std::string>()),
+                                             std::stod(ask[1].get<std::string>())});
                 }
 
                 s_symbolBook.handleDepthUpdate(s_update);

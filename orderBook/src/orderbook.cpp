@@ -1,8 +1,13 @@
 #include "orderbook.hpp"
 #include <iomanip>
+#include <cmath>
+
+static bool isValidPrice(double p)    { return std::isfinite(p) && p > 0.0; }
+static bool isValidQuantity(double q) { return std::isfinite(q) && q >= 0.0; }
 
 void OrderBook::updateBid(double dPrice, double dQuantity) {
-    if (dQuantity == 0) {
+    if (!isValidPrice(dPrice) || !isValidQuantity(dQuantity)) return;
+    if (dQuantity == 0.0) {
         bids.erase(dPrice);
     } else {
         bids[dPrice] = dQuantity;
@@ -10,7 +15,8 @@ void OrderBook::updateBid(double dPrice, double dQuantity) {
 }
 
 void OrderBook::updateAsk(double dPrice, double dQuantity) {
-    if (dQuantity == 0) {
+    if (!isValidPrice(dPrice) || !isValidQuantity(dQuantity)) return;
+    if (dQuantity == 0.0) {
         asks.erase(dPrice);
     } else {
         asks[dPrice] = dQuantity;
@@ -41,9 +47,9 @@ void OrderBook::applySnapshot(int64_t snapshotLastUpdateId,
     bids.clear();
     asks.clear();
     for (const auto& [price, qty] : snapshotBids)
-        if (qty > 0) bids[price] = qty;
+        if (isValidPrice(price) && qty > 0.0) bids[price] = qty;
     for (const auto& [price, qty] : snapshotAsks)
-        if (qty > 0) asks[price] = qty;
+        if (isValidPrice(price) && qty > 0.0) asks[price] = qty;
     lastUpdateId = snapshotLastUpdateId;
 }
 

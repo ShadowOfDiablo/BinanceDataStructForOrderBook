@@ -12,3 +12,10 @@ add_subdirectory(symbolBook)
 # Main executable
 add_executable(symbolbook_main main.cpp)
 target_link_libraries(symbolbook_main PRIVATE symbolBook)
+
+# Tests
+enable_testing()
+add_subdirectory(tests)
+
+# Benchmarks
+add_subdirectory(benchmarks)

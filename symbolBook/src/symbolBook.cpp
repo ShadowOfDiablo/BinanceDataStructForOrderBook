@@ -27,8 +27,6 @@ void SymbolBook::updateOrderBook(const std::string& strSymbol, double dPrice, do
 void SymbolBook::applySnapshot(const Snapshot& sSnapshot) {
     orderBooks[sSnapshot.strSymbol].applySnapshot(
         sSnapshot.llLastUpdateId, sSnapshot.bids, sSnapshot.asks);
-    std::cout << "Snapshot applied for " << sSnapshot.strSymbol
-              << " lastUpdateId=" << sSnapshot.llLastUpdateId << "\n";
 }
 
 void SymbolBook::handleDepthUpdate(const DepthUpdate& sUpdate)
