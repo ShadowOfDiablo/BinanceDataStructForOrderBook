@@ -31,29 +31,38 @@ void SymbolBook::applySnapshot(const Snapshot& sSnapshot) {
 
 void SymbolBook::handleDepthUpdate(const DepthUpdate& sUpdate)
 {
-    int returnCode = 0;
-    auto& sBook = orderBooks[sUpdate.strSymbol];
-
-    if (sUpdate.llFinalUpdateId <= sBook.getLastUpdateId()) {
-        returnCode = 1;
-        std::cerr << "Skipping update for " << sUpdate.strSymbol
-                  << " u=" << sUpdate.llFinalUpdateId
-                  << " lastUpdateId=" << sBook.getLastUpdateId() << "\n";
+    // Per spec: snapshot must precede any update for a symbol. An update for a
+    // symbol with no book is a protocol violation — drop it without creating stub entry
+    auto it = orderBooks.find(sUpdate.strSymbol);
+    if (it == orderBooks.end()) {
+        std::cerr << "Update for unknown symbol " << sUpdate.strSymbol
+                  << " — no snapshot received yet, dropping.\n";
         return;
     }
+    auto& sBook = it->second;
 
-    if (sUpdate.llFirstUpdateId > sBook.getLastUpdateId() + 1) {
-        returnCode = 2;
-        std::cerr << "Gap detected for " << sUpdate.strSymbol
-                  << ". Expected " << sBook.getLastUpdateId() + 1
-                  << " but got U=" << sUpdate.llFirstUpdateId << ". Need resync.\n";
-        return;
+    if (sUpdate.llFinalUpdateId != 0) {
+        if (sUpdate.llFinalUpdateId < sBook.getLastUpdateId()) {
+            std::cerr << "Skipping stale update for " << sUpdate.strSymbol
+                      << " u=" << sUpdate.llFinalUpdateId
+                      << " lastUpdateId=" << sBook.getLastUpdateId() << "\n";
+            return;
+        }
+        if (sUpdate.llFirstUpdateId > sBook.getLastUpdateId() + 1) {
+            std::cerr << "Gap detected for " << sUpdate.strSymbol
+                      << ". Expected " << sBook.getLastUpdateId() + 1
+                      << " but got U=" << sUpdate.llFirstUpdateId
+                      << ". Discarding book — resync required.\n";
+            // Per spec: Subsequent updates will be rejected as
+            // unknown-symbol until a fresh snapshot is applied.
+            orderBooks.erase(it);
+            return;
+        }
+        sBook.setLastUpdateId(sUpdate.llFinalUpdateId);
     }
 
     for (const auto& [dPrice, dQuantity] : sUpdate.bids)
         sBook.updateBid(dPrice, dQuantity);
     for (const auto& [dPrice, dQuantity] : sUpdate.asks)
         sBook.updateAsk(dPrice, dQuantity);
-
-    sBook.setLastUpdateId(sUpdate.llFinalUpdateId);
 }

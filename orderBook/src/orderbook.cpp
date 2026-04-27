@@ -11,6 +11,10 @@ void OrderBook::updateBid(uint64_t price, double qty) {
         bids.erase(price);
     } else {
         bids[price] = qty;
+#ifndef EXTENDED_DEPTH
+        if (bids.size() > MAX_DEPTH)
+            bids.erase(std::prev(bids.end())); // drop lowest bid (worst price)
+#endif
     }
 }
 
@@ -20,6 +24,10 @@ void OrderBook::updateAsk(uint64_t price, double qty) {
         asks.erase(price);
     } else {
         asks[price] = qty;
+#ifndef EXTENDED_DEPTH
+        if (asks.size() > MAX_DEPTH)
+            asks.erase(std::prev(asks.end())); // drop highest ask (worst price)
+#endif
     }
 }
 
@@ -50,6 +58,11 @@ void OrderBook::applySnapshot(int64_t snapshotLastUpdateId,
         if (isValidPrice(price) && qty > 0.0) bids[price] = qty;
     for (const auto& [price, qty] : snapshotAsks)
         if (isValidPrice(price) && qty > 0.0) asks[price] = qty;
+#ifndef EXTENDED_DEPTH
+    // Snapshot from the diff stream may contain more levels than MAX_DEPTH; keep best prices only.
+    while (bids.size() > MAX_DEPTH) bids.erase(std::prev(bids.end()));
+    while (asks.size() > MAX_DEPTH) asks.erase(std::prev(asks.end()));
+#endif
     lastUpdateId = snapshotLastUpdateId;
 }
 
@@ -62,12 +75,6 @@ int64_t OrderBook::getLastUpdateId() const {
 }
 
 OrderBook::OrderBook() : lastUpdateId(0) {
-}
-
-OrderBook::~OrderBook() {
-    bids.clear();
-    asks.clear();
-    lastUpdateId = 0;
 }
 
 OrderBook::OrderBook(const OrderBook& source) {
@@ -83,10 +90,6 @@ OrderBook& OrderBook::operator=(const OrderBook& source) {
         asks = source.asks;
     }
     return *this;
-}
-
-bool OrderBook::operator==(const OrderBook& other) const {
-    return lastUpdateId == other.lastUpdateId && bids == other.bids && asks == other.asks;
 }
 
 uint64_t OrderBook::getBestBid() const {

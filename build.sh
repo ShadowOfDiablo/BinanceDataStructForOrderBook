@@ -1,17 +1,21 @@
 #!/bin/bash
 set -e
 
-# Run setup to ensure tools and dependencies are ready
-./setup.sh
+# Ensure the C++ JSON header is present (downloaded by setup.sh)
+if [ ! -f "orderBook/inc/json.hpp" ]; then
+    ./setup.sh
+fi
 
-# Build the C++ project
-echo "Building C++ engine..."
-rm -rf build
-mkdir build
+# Build the C++ engine (incremental — only recompiles changed files)
+mkdir -p build
 cd build
-cmake ..
-make
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make symbolbook_main -j$(nproc)
 cd ..
 
-# Run the application
-./run.sh
+# Feed stdin straight into the engine.
+# Works three ways:
+#   ./build.sh                     — interactive: paste JSON lines, Ctrl+D when done
+#   cat sample.jsonl | ./build.sh  — pipe a file through
+#   ./build.sh < sample.jsonl      — redirect a file in
+./build/symbolbook_main

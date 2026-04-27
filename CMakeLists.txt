@@ -5,6 +5,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Depth mode: OFF = normal (20 levels, Binance standard cap)
+#             ON  = extended (50 levels)
+# Pass -DEXTENDED_DEPTH=ON to cmake to enable extended mode.
+option(EXTENDED_DEPTH "Build with 50-level extended depth (default: 20-level standard cap)" OFF)
+
 # Add subdirectories in order of dependency
 add_subdirectory(orderBook)
 add_subdirectory(symbolBook)

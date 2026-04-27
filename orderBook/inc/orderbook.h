@@ -7,6 +7,13 @@
 #include <iostream>
 
 class OrderBook {
+public:
+    // Normal mode: 20 levels per side — matches Binance's @depth20 partial stream cap.
+    // Extended mode (-DEXTENDED_DEPTH=ON): no cap; Binance snapshots go up to 5000 levels/side.
+#ifndef EXTENDED_DEPTH
+    static constexpr std::size_t MAX_DEPTH = 20;
+#endif
+
 private:
     int64_t lastUpdateId = 0;
     // Bids: highest price first (prices stored as uint64_t ticks = price × 1e8)
@@ -23,10 +30,9 @@ public:
     int64_t getLastUpdateId() const;
     void display() const;
     OrderBook();
-    ~OrderBook();
+    ~OrderBook() = default;
     OrderBook(const OrderBook& source);
     OrderBook& operator=(const OrderBook& source);
-    bool operator==(const OrderBook& other) const;
     uint64_t getBestBid() const;
     uint64_t getBestAsk() const;
 };

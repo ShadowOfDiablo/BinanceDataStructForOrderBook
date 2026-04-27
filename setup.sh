@@ -33,7 +33,7 @@ else
 fi
 
 # 4. Ensure scripts are executable
-chmod +x build.sh run.sh
+chmod +x build.sh binance_api.sh testing.sh benchmark.sh
 echo "Permissions updated."
 
 echo "--- Setup Complete ---"
