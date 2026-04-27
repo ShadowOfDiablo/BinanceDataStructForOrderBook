@@ -2,7 +2,12 @@
 #include "orderbook.hpp"
 #include "symbolBook.hpp"
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Prices are stored as integer ticks (price × 1e8) so that map keys are exact
+// integers with no floating-point comparison ambiguity. The two constants below
+// define the synthetic price space used across all benchmarks: a base of 1.0
+// and a step of 0.0001 between adjacent levels, mirroring a realistic tight spread.
+static constexpr uint64_t BENCH_BASE = 100000000ULL;  // 1.0 × 1e8 — midpoint price
+static constexpr uint64_t BENCH_STEP = 10000ULL;       // 0.0001 × 1e8 — per-level spacing
 
 static SymbolBook makeSymbolBook(int numSymbols, int levelsPerSide) {
     SymbolBook sb;
@@ -13,15 +18,16 @@ static SymbolBook makeSymbolBook(int numSymbols, int levelsPerSide) {
         snap.strSymbol      = buf;
         snap.llLastUpdateId = 0;
         for (int l = 1; l <= levelsPerSide; ++l) {
-            snap.bids.push_back({1.0 - l * 0.0001, static_cast<double>(l)});
-            snap.asks.push_back({1.0 + l * 0.0001, static_cast<double>(l)});
+            snap.bids.push_back({BENCH_BASE - l * BENCH_STEP, static_cast<double>(l)});
+            snap.asks.push_back({BENCH_BASE + l * BENCH_STEP, static_cast<double>(l)});
         }
         sb.applySnapshot(snap);
     }
     return sb;
 }
 
-// ── Benchmarks ────────────────────────────────────────────────────────────────
+// Benchmarks for SymbolBook operations: applying snapshots, handling depth updates,
+// and retrieving best bid/ask prices.
 
 static void BM_ApplySnapshot(benchmark::State& state) {
     const int levels = state.range(0);
@@ -29,8 +35,8 @@ static void BM_ApplySnapshot(benchmark::State& state) {
     snap.strSymbol      = "BENCH";
     snap.llLastUpdateId = 0;
     for (int l = 1; l <= levels; ++l) {
-        snap.bids.push_back({1.0 - l * 0.0001, static_cast<double>(l)});
-        snap.asks.push_back({1.0 + l * 0.0001, static_cast<double>(l)});
+        snap.bids.push_back({BENCH_BASE - l * BENCH_STEP, static_cast<double>(l)});
+        snap.asks.push_back({BENCH_BASE + l * BENCH_STEP, static_cast<double>(l)});
     }
 
     for (auto _ : state) {
@@ -56,8 +62,8 @@ static void BM_HandleDepthUpdate(benchmark::State& state) {
             d.strSymbol       = buf;
             d.llFirstUpdateId = seq;
             d.llFinalUpdateId = seq;
-            d.bids.push_back({1.0 - (seq % 100) * 0.0001, static_cast<double>(seq)});
-            d.asks.push_back({1.0 + (seq % 100) * 0.0001, static_cast<double>(seq)});
+            d.bids.push_back({BENCH_BASE - (seq % 100) * BENCH_STEP, static_cast<double>(seq)});
+            d.asks.push_back({BENCH_BASE + (seq % 100) * BENCH_STEP, static_cast<double>(seq)});
             sb.handleDepthUpdate(d);
         }
         ++seq;

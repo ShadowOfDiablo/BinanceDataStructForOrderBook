@@ -1,49 +1,49 @@
-#include "orderbook.hpp"
+#include "orderbook.h"
 #include <iomanip>
 #include <cmath>
 
-static bool isValidPrice(double p)    { return std::isfinite(p) && p > 0.0; }
-static bool isValidQuantity(double q) { return std::isfinite(q) && q >= 0.0; }
+static bool isValidPrice(uint64_t p)    { return p > 0; }
+static bool isValidQuantity(double q)   { return std::isfinite(q) && q >= 0.0; }
 
-void OrderBook::updateBid(double dPrice, double dQuantity) {
-    if (!isValidPrice(dPrice) || !isValidQuantity(dQuantity)) return;
-    if (dQuantity == 0.0) {
-        bids.erase(dPrice);
+void OrderBook::updateBid(uint64_t price, double qty) {
+    if (!isValidPrice(price) || !isValidQuantity(qty)) return;
+    if (qty == 0.0) {
+        bids.erase(price);
     } else {
-        bids[dPrice] = dQuantity;
+        bids[price] = qty;
     }
 }
 
-void OrderBook::updateAsk(double dPrice, double dQuantity) {
-    if (!isValidPrice(dPrice) || !isValidQuantity(dQuantity)) return;
-    if (dQuantity == 0.0) {
-        asks.erase(dPrice);
+void OrderBook::updateAsk(uint64_t price, double qty) {
+    if (!isValidPrice(price) || !isValidQuantity(qty)) return;
+    if (qty == 0.0) {
+        asks.erase(price);
     } else {
-        asks[dPrice] = dQuantity;
+        asks[price] = qty;
     }
 }
 
 void OrderBook::display() const {
     std::cout << "\n--- Order Book ---\n";
-    std::cout << std::fixed << std::setprecision(4);
-    
+    std::cout << std::fixed << std::setprecision(8);
+
     std::cout << "Asks:\n";
     for (auto it = asks.rbegin(); it != asks.rend(); ++it) {
-        std::cout << it->first << " : " << it->second << "\n";
+        std::cout << (static_cast<double>(it->first) / 1e8) << " : " << it->second << "\n";
     }
-    
+
     std::cout << "------------------\n";
-    
+
     std::cout << "Bids:\n";
-    for (const auto& [dPrice, dQuantity] : bids) {
-        std::cout << dPrice << " : " << dQuantity << "\n";
+    for (const auto& [price, qty] : bids) {
+        std::cout << (static_cast<double>(price) / 1e8) << " : " << qty << "\n";
     }
     std::cout << "------------------\n";
 }
 
 void OrderBook::applySnapshot(int64_t snapshotLastUpdateId,
-                              const std::vector<std::pair<double, double>>& snapshotBids,
-                              const std::vector<std::pair<double, double>>& snapshotAsks) {
+                              const std::vector<std::pair<uint64_t, double>>& snapshotBids,
+                              const std::vector<std::pair<uint64_t, double>>& snapshotAsks) {
     bids.clear();
     asks.clear();
     for (const auto& [price, qty] : snapshotBids)
@@ -89,10 +89,10 @@ bool OrderBook::operator==(const OrderBook& other) const {
     return lastUpdateId == other.lastUpdateId && bids == other.bids && asks == other.asks;
 }
 
-double OrderBook::getBestBid() const {
-    return bids.empty() ? 0.0 : bids.begin()->first;
+uint64_t OrderBook::getBestBid() const {
+    return bids.empty() ? 0 : bids.begin()->first;
 }
 
-double OrderBook::getBestAsk() const {
-    return asks.empty() ? 0.0 : asks.begin()->first;
+uint64_t OrderBook::getBestAsk() const {
+    return asks.empty() ? 0 : asks.begin()->first;
 }

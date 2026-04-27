@@ -1,4 +1,4 @@
-#include "symbolBook.hpp"
+#include "symbolBook.h"
 
 void SymbolBook::display() const {
     for (const auto& [strSymbol, sOrderBook] : orderBooks) {
@@ -16,11 +16,11 @@ const OrderBook& SymbolBook::getOrderBook(const std::string& strSymbol) const {
     return it->second;
 }
 
-void SymbolBook::updateOrderBook(const std::string& strSymbol, double dPrice, double dQuantity, bool bIsBid) {
+void SymbolBook::updateOrderBook(const std::string& strSymbol, uint64_t price, double qty, bool bIsBid) {
     if (bIsBid) {
-        orderBooks[strSymbol].updateBid(dPrice, dQuantity);
+        orderBooks[strSymbol].updateBid(price, qty);
     } else {
-        orderBooks[strSymbol].updateAsk(dPrice, dQuantity);
+        orderBooks[strSymbol].updateAsk(price, qty);
     }
 }
 

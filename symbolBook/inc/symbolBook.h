@@ -1,13 +1,17 @@
+#ifndef SYMBOLBOOK_HPP
+#define SYMBOLBOOK_HPP
+
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "orderbook.hpp"
+#include "orderbook.h"
 
 struct Snapshot {
     std::string strSymbol;
     long long llLastUpdateId;
-    std::vector<std::pair<double, double>> bids;
-    std::vector<std::pair<double, double>> asks;
+    std::vector<std::pair<uint64_t, double>> bids;
+    std::vector<std::pair<uint64_t, double>> asks;
 };
 
 struct DepthUpdate {
@@ -16,8 +20,8 @@ struct DepthUpdate {
     std::string strSymbol;
     long long llFirstUpdateId;
     long long llFinalUpdateId;
-    std::vector<std::pair<double, double>> bids;
-    std::vector<std::pair<double, double>> asks;
+    std::vector<std::pair<uint64_t, double>> bids;
+    std::vector<std::pair<uint64_t, double>> asks;
 };
 
 class SymbolBook {
@@ -27,8 +31,10 @@ private:
 public:
     void display() const;
     const OrderBook& getOrderBook(const std::string& strSymbol) const;
-    void updateOrderBook(const std::string& strSymbol, double dPrice, double dQuantity, bool bIsBid);
+    void updateOrderBook(const std::string& strSymbol, uint64_t price, double qty, bool bIsBid);
     void applySnapshot(const Snapshot& sSnapshot);
     void handleDepthUpdate(const DepthUpdate& sUpdate);
     ~SymbolBook() = default;
 };
+
+#endif // SYMBOLBOOK_HPP
