@@ -17,10 +17,16 @@ const OrderBook& SymbolBook::getOrderBook(const std::string& strSymbol) const {
 }
 
 void SymbolBook::updateOrderBook(const std::string& strSymbol, uint64_t price, double qty, bool bIsBid) {
+    auto it = orderBooks.find(strSymbol);
+    if (it == orderBooks.end()) {
+        std::cerr << "updateOrderBook for unknown symbol " << strSymbol
+                  << " — no snapshot received yet, dropping.\n";
+        return;
+    }
     if (bIsBid) {
-        orderBooks[strSymbol].updateBid(price, qty);
+        it->second.updateBid(price, qty);
     } else {
-        orderBooks[strSymbol].updateAsk(price, qty);
+        it->second.updateAsk(price, qty);
     }
 }
 
